@@ -1,8 +1,38 @@
 import numpy as np
+from tqdm import tqdm
 from copy import deepcopy
 
+def generate_boards(depth, num, board=None):
+    if not board:
+        goal = Board()
+    unique = set()
+    already_seen = set()
+    possible = [goal]
+    prog = tqdm(total=100)
+    
+    current_depth = 1
+    while len(possible):
+        next = []
+        for b in possible:
+            neighbors = b.neighbors()
+            if current_depth == depth:
+                unique.update([n for n in neighbors if n.valid_board() 
+                                and not n.solved and n not in already_seen])
+                prog.update(len(neighbors))
+                if len(unique) >= num:
+                    return unique
+            else:
+                not_seen = set(neighbors) - already_seen
+                next.extend(not_seen)
+                already_seen.update(not_seen)
+        current_depth += 1
+        possible = next
+    
+    return unique
 class Board:
-    def __init__(self):
+    def __init__(self, goal=None):
+        if goal is None:
+            self.goal = np.array([i for i in range(9)])
         self._board = np.array([i for i in range(9)])
 
     @property
@@ -15,7 +45,7 @@ class Board:
 
     @property
     def solved(self):
-        return np.array_equal(self.board, np.array([i for i in range(9)]))
+        return np.array_equal(self.board, self.goal)
 
     def valid_board(self):
         inversions = 0
@@ -25,10 +55,25 @@ class Board:
                         inversions += 1
 
         return (inversions % 2 == 0 and inversions > 0)
-    
+
+    def heuristic(self, value):
+        if value == 0:
+            # misplaced tile heuristic
+            cost = sum([1 for i in range(9) if i != self.board[i] and self.board[i] != 0])
+        else:
+            cost = sum([self._individual_distance(pos) 
+                        for pos in range(9) if self.board[pos] != 0 and self.board[pos] != pos])
+        
+        return cost      
+
+    def _individual_distance(self, pos):
+        incorrect = self.board[pos]
+
+        return abs(incorrect//3 - pos//3) + abs(incorrect%3 - pos%3)
+
     def valid_move(self, end):
         start = self.blank
-        if start == 0 and end < 0 :
+        if start >= 0 and end < 0 :
             return False
 
         if end / 3 > 2:
@@ -63,8 +108,7 @@ class Board:
             to_swap = blank + move
             if self.valid_move(to_swap):
                 new_board = self.swap_tile(to_swap)
-                if new_board not in neighbors:
-                    neighbors.add(new_board)
+                neighbors.add(new_board)
 
         return neighbors
 
@@ -75,15 +119,11 @@ class Board:
         return np.array_equal(self._board, value.board)
 
     def __repr__(self):
-        return str(self.board.reshape(3, 3))
+        return "\n{}".format(self.board.reshape(3, 3))
 
     def __hash__(self):
         return hash(str(self.board))
 
 
 if __name__ == '__main__':
-    b = Board()
-    print(b)
-
-    n = b.neighbors()
-    print(n)
+    generate_boards(64, 100)

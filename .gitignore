@@ -1,1 +1,4 @@
 *.vscode
+*.lprof
+__pycache__
+
