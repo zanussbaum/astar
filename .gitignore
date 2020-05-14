@@ -1,4 +1,6 @@
 *.vscode
 *.lprof
+*.p
+*.png
 __pycache__
 

@@ -1,39 +1,67 @@
 import numpy as np
+import dill as pickle
 from tqdm import tqdm
 from copy import deepcopy
+from collections import defaultdict
 
-def generate_boards(depth, num, board=None):
-    if not board:
-        goal = Board()
-    unique = set()
-    already_seen = set()
-    possible = [goal]
-    prog = tqdm(total=100)
-    
-    current_depth = 1
-    while len(possible):
-        next = []
-        for b in possible:
-            neighbors = b.neighbors()
-            if current_depth == depth:
-                unique.update([n for n in neighbors if n.valid_board() 
-                                and not n.solved and n not in already_seen])
-                prog.update(len(neighbors))
-                if len(unique) >= num:
-                    return unique
+def generate_board(depth, board):
+    i = 0
+
+    moves = [-1, 1, 3, -3]
+    last_move = 0
+    while i < depth:
+        move = np.random.choice([m for m in moves if m != -last_move])
+        pos = board.blank + move
+        while not board.valid_move(pos):
+            move = np.random.choice([m for m in moves if m != -last_move])
+            pos = board.blank + move
+
+        new_board = board.swap_tile(pos)
+        i += 1
+        board = new_board
+        last_move = move
+        
+    return board
+
+def generate_random_boards():
+    puzzles = defaultdict(set)
+    goal = np.array([i for i in range(9)])
+    done = 0
+    pbar = tqdm(total=1200, desc="Generating random boards")
+    while done < 12:
+        for depth in range(2, 25, 2):
+            np.random.shuffle(goal)
+            if len(puzzles[depth]) < 100:
+                goal_board = Board(goal)
+                board = generate_board(depth, goal_board)
+            
+                use = True
+                for value in puzzles.values():
+                    if board in value:
+                        use = False
+                        break
+
+                if use:
+                    puzzles[depth].add(board)
+                    pbar.update(1)
             else:
-                not_seen = set(neighbors) - already_seen
-                next.extend(not_seen)
-                already_seen.update(not_seen)
-        current_depth += 1
-        possible = next
+                done += 1
+
+    for key, value in puzzles.items():
+        with open("puzzles/depth_{}_puzzles.p".format(key), 'wb') as f:
+            pickle.dump(value, f)
+
+    print("saved random boards")
+
+    return puzzles
     
-    return unique
 class Board:
     def __init__(self, goal=None):
         if goal is None:
             self.goal = np.array([i for i in range(9)])
-        self._board = np.array([i for i in range(9)])
+        else:
+            self.goal = goal
+        self._board = deepcopy(self.goal)
 
     @property
     def board(self):
@@ -57,26 +85,29 @@ class Board:
         return (inversions % 2 == 0 and inversions > 0)
 
     def heuristic(self, value):
+        # these are wrong for random boards
         if value == 0:
             # misplaced tile heuristic
-            cost = sum([1 for i in range(9) if i != self.board[i] and self.board[i] != 0])
+            cost = sum([1 for i in range(9) if self.board[i] != self.goal[i] and self.board[i] != 0])
         else:
+            #need to fix
             cost = sum([self._individual_distance(pos) 
-                        for pos in range(9) if self.board[pos] != 0 and self.board[pos] != pos])
+                        for pos in range(9) if self.board[pos] != 0 and self.board[pos] != self.goal[pos]])
         
         return cost      
 
     def _individual_distance(self, pos):
-        incorrect = self.board[pos]
+        incorrect_tile = self.board[pos]
+        correct_pos = np.argwhere(self.goal==incorrect_tile)
 
-        return abs(incorrect//3 - pos//3) + abs(incorrect%3 - pos%3)
+        return abs(pos//3 - correct_pos//3) + abs(pos%3 - correct_pos%3)
 
     def valid_move(self, end):
         start = self.blank
         if start >= 0 and end < 0 :
             return False
 
-        if end / 3 > 2:
+        if end // 3 > 2:
             return False
 
         if start // 3 != end // 3:
@@ -126,4 +157,4 @@ class Board:
 
 
 if __name__ == '__main__':
-    generate_boards(64, 100)
+    generate_random_boards()

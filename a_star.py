@@ -1,7 +1,8 @@
 import heapq as h
+import numpy as np 
+from board import Board, generate_board
 from collections import deque
 from node import Node
-from board import generate_boards, Board
 
 def reconstruct_path(came_from, current):
     path = deque([current])
@@ -21,10 +22,12 @@ def a_star(start, heuristic):
     current_cost = {}
     current_cost[start.board] = 0
 
+    nodes = 1
+
     while len(open_set) > 0:
         current = h.heappop(open_set)
         if current.board.solved:
-            return reconstruct_path(came_from, current)
+            return nodes, current.depth
 
         neighbors = [Node(c, current.depth+1, heuristic) for c in current.board.neighbors()]
 
@@ -33,15 +36,20 @@ def a_star(start, heuristic):
                 current_cost[n.board] = n.cost
                 h.heappush(open_set, n)
                 came_from[n] = current
+                nodes += 1
         
     raise ValueError("Unsolvable")
 
 
 if __name__ == '__main__':
-    boards = generate_boards(8, 1)
+    goal = np.array([i for i in range(9)])
+    np.random.shuffle(goal)
+    goal_board = Board(goal)
+    board = generate_board(4, goal_board)
 
-    start = Node(boards.pop())
+    start = Node(board, heuristic=1)
     print("started from: {}\n".format(start))
-    path = a_star(start, 1)
+    nodes, depth, path = a_star(start, 1)
+    print(nodes, depth)
     print(path)
 

@@ -11,6 +11,7 @@ class Node:
     def __lt__(self, value):
         if self.cost == value.cost:
             return self.depth < value.depth
+        return self.cost < value.cost
 
     def __repr__(self):
         return self.board.__repr__()
